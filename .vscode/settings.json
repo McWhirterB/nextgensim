@@ -1,0 +1,36 @@
+{ "debug.inlineValues": "off",
+    "window.newWindowDimensions": "inherit",
+    "terminal.integrated.defaultProfile.windows": "Command Prompt",
+    "security.workspace.trust.untrustedFiles": "open",
+    "editor.minimap.enabled": false,
+    "workbench.startupEditor": "none",
+    "workbench.editorLargeFileConfirmation": 2048,
+    "window.restoreWindows": "none",
+    "files.hotExit": "off",
+    "security.workspace.trust.enabled": false,
+    "extensions.ignoreRecommendations": true,
+    "terminal.integrated.copyOnSelection": true,
+    "editor.wordWrap": "on",
+    "update.showReleaseNotes": false,
+    "workbench.editor.customLabels.enabled": true,
+    "workbench.editor.customLabels.patterns": {
+        "/**/*.acuscreen": "Screen Designer - ${filename}",
+        "/**/*.evts": "Event Paragraph - ${filename}",
+        "/**/*.wrks": "Working Storage - ${filename}"
+    },
+    "rocketCOBOL.installLocation": "c:\\CommunityEdition",
+    "rocketCOBOL.editor.customTabStops": [],
+    "rocketCOBOL.editor.sourceFormat": "variable",
+    "[cobol]": {
+        "editor.wordSeparators": "`~!@#$%^&*()=+[{]}\\|;:'\",.<>/?",
+        "editor.rulers": [
+            6,
+            7,
+            11,
+            72
+        ],
+        "editor.guides.indentation": false,
+        "editor.formatOnType": false
+    },
+    "workbench.settings.applyToAllProfiles": []
+}
