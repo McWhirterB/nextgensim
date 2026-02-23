@@ -20,7 +20,7 @@
            05 user-money    pic S9(5) value 0.
            05 user-bank     pic S9(7) value 0.
            05 transfer-amt  pic 9(5) value 0.
-           05 dance-step    pic 9(3) value 0.
+           05 dance-step    pic 9(3) value 6.
        
        01  stats.
            05 hacking-level   pic 9(3) value 1.
@@ -437,6 +437,7 @@
 
        999-exit.
            move 3 to programcall
+           move 6 to dance-step
            call "./utils/imagedisplay" using programcall 
                dance-step
            display erase screen

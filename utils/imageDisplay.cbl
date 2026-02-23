@@ -9,6 +9,8 @@
        working-storage section.
        01  keypress     pic x(1).
        01  loop-counter pic 9(3).
+       01  random-event  PIC 9(2).
+       01  random-seed  PIC 9(8).
        01  max-wallet-change pic S9(5) value 0.
        01  work-timer.
            05  starttime     pic 9(7) value 0.
@@ -23,36 +25,52 @@
 
        procedure division using programcall dance-step wallet-change
                job-level.
+
            perform 000-evaluate-programcall.
+
+           000-random-number.
+           accept random-seed from time
+           compute random-event = function mod(random-seed, 4) + 1.
            000-evaluate-programcall.
+           perform 000-random-number
            display erase screen
            if programcall = 0
                perform nextgensplash
                accept keypress
                goback
-           end-if
-           if programcall = 1
+           else if programcall = 1
                perform 110-work
                goback
-           else
+           else if programcall = 3
                perform 100-dance
            end-if.
+
+           050-random-work.
+              if random-event = 1
+                perform talk
+              else if random-event = 2
+                perform skate
+              else if random-event = 3
+                perform work2
+              else
+                perform work
+              end-if.
 
            100-dance.
            move dance-step to loop-counter
            perform varying loop-counter by -1 until loop-counter = 0
            perform crabdance1
-           accept keypress
+           call "C$SLEEP" using 1
            display erase screen 
            perform crabdance2
-           accept keypress
+           call "C$SLEEP" using 1
            display erase screen
            end-perform
            goback.
 
            110-work.
               accept starttime from time
-              perform work
+              perform 050-random-work
               accept keypress at 1540
               accept endtime from time
               display erase screen
@@ -113,6 +131,26 @@
            display "===================================================" 
            .
 
+           skate.
+           display "===================================================" 
+           display "|                __                               |" 
+           display "|             __/__\                              |" 
+           display "|              | oo |   ____                      |" 
+           display "|               \__/   |-   |\                    |" 
+           display "|               _|__   |    | |                   |" 
+           display "|              / |  o~~|____|_|                   |" 
+           display "|                |   |______| |                   |" 
+           display "|               / \  |      | |                   |" 
+           display "|              /   | |      | |                   |" 
+           display "|            o-----o |      | |                   |" 
+           display "===================================================" 
+           display "|                                                 |" 
+           display "|                                                 |" 
+           display "|        Press any key to stop working            |" 
+           display "|                                                 |" 
+           display "===================================================" 
+           .
+
            work2.
            display "===================================================" 
            display "|                __                               |" 
@@ -125,6 +163,26 @@
            display "|              |__ \ |      | |                   |" 
            display "|                |  \|      | |                   |" 
            display "|               olo  |      | |                   |" 
+           display "===================================================" 
+           display "|                                                 |" 
+           display "|                                                 |" 
+           display "|        Press any key to stop working            |" 
+           display "|                                                 |" 
+           display "===================================================" 
+           .
+
+           talk.
+           display "===================================================" 
+           display "|                __          __                   |" 
+           display "|             __/__\        /  \                  |" 
+           display "|              | -- |      | oo |                 |" 
+           display "|               \__/       | v  |                 |" 
+           display "|               _|__dU      \__/                  |" 
+           display "|              / |        Ub__|_/                 |" 
+           display "|                |            |                   |" 
+           display "|               / \           |                   |" 
+           display "|              |   |         / \                  |" 
+           display "|              |   |        |   |                 |" 
            display "===================================================" 
            display "|                                                 |" 
            display "|                                                 |" 
