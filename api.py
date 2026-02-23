@@ -10,7 +10,7 @@ import time
 import configparser
 from urllib3.exceptions import InsecureRequestWarning
 
-# Load configuration
+
 config = configparser.ConfigParser()
 config.read('./config.ini')
 
@@ -25,10 +25,6 @@ if not host.startswith('http'):
     host = 'https://' + host
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
-
-# =============================================================================
-# z/OSMF Connection Functions
-# =============================================================================
 
 def connect_to_zosmf():
     """Create authenticated session to z/OSMF"""
@@ -79,10 +75,6 @@ def get_job_output(session, jobname, jobid):
     except:
         return ""
 
-# =============================================================================
-# JCL Parameter Substitution
-# =============================================================================
-
 PARAM_MAP = {
     'USERNAME': 'CRBNAME',
     'USERPASS': 'CRBPASS', 
@@ -120,10 +112,6 @@ def submit_parameterized_job(job_name, parameters):
         return {'success': True, 'output': job_output, 'jobid': job_info['jobid']}
     except Exception as e:
         return {'success': False, 'error': str(e), 'output': ''}
-
-# =============================================================================
-# DB2 Output Parsing Functions
-# =============================================================================
 
 def get_row_count(output):
     """Extract row count from DB2 RETRIEVAL message"""
@@ -175,10 +163,6 @@ def parse_highscores(output):
                     continue
     return scores
 
-# =============================================================================
-# Response Writing
-# =============================================================================
-
 def write_response(message):
     """Write response to file for COBOL to read"""
     try:
@@ -189,10 +173,6 @@ def write_response(message):
             f.write(message)
     except:
         pass
-
-# =============================================================================
-# Action Handlers
-# =============================================================================
 
 def handle_checkuser(args):
     if len(args) < 1:
@@ -207,11 +187,9 @@ def handle_checkuser(args):
 def handle_register(args):
     if len(args) < 2:
         return write_response("ERROR:Missing username or password")
-    # Check if user exists first
     check = submit_parameterized_job('CHECKUSER', {'USERNAME': args[0]})
     if check['success'] and get_row_count(check['output']) > 0:
         return write_response(f"ERROR:Username {args[0]} already exists")
-    # Add user
     result = submit_parameterized_job('ADDUSER', {'USERNAME': args[0], 'USERPASS': args[1]})
     if result['success'] and check_sql_success(result['output']):
         write_response(f"SUCCESS:REGISTERED:{args[0]}")
@@ -298,11 +276,7 @@ def handle_getusers(args):
         write_response("SUCCESS:Users retrieved")
     else:
         write_response(f"ERROR:{result['error']}")
-
-# =============================================================================
-# Main Entry Point
-# =============================================================================
-
+        
 HANDLERS = {
     'CHECKUSER': handle_checkuser,
     'REGISTER': handle_register,
