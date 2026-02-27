@@ -43,6 +43,8 @@
                goback
            else if programcall = 3
                perform 100-dance
+           else if programcall = 4
+               perform 120-hack
            end-if.
 
            050-random-work.
@@ -90,6 +92,11 @@
               display "Press any key to continue..." at 0602
               accept keypress
               goback.
+
+           120-hack.
+             perform hacking
+             accept keypress at 1540
+             goback.
        
            nextgensplash.
            display "                             $$    $$         ", 
@@ -187,6 +194,26 @@
            display "|                                                 |" 
            display "|                                                 |" 
            display "|        Press any key to stop working            |" 
+           display "|                                                 |" 
+           display "===================================================" 
+           .
+
+           hacking.
+           display "===================================================" 
+           display "|                   __           ____             |" 
+           display "|                  /__\__       |    |\           |" 
+           display "|              __ |o=o=|        |ATM | |          |" 
+           display "|             /  /\\__/         |____|_|          |" 
+           display "|            | $|\_\|   -       |____| |          |" 
+           display "|            \__/   |   --      |    | |          |" 
+           display "|                   |   -       |   .| |          |" 
+           display "|                  / \          |    | |          |" 
+           display "|                 /   \         |    | |          |" 
+           display "|               o-----o         |____|_|          |" 
+           display "===================================================" 
+           display "|              HACK SUCCESSFUL                    |" 
+           display "|    $500 dollars has been added to your bank     |" 
+           display "|        Press any key to Continue                |" 
            display "|                                                 |" 
            display "===================================================" 
            .

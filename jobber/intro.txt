@@ -1,0 +1,19 @@
+ 020-jobber-intro.
+           display "In January 2026, CRE a St.Louis based real estate"
+                   at 0202
+           display "company, gave a report asking retirees how much"
+                   at 0302
+           display "money you should have before you retire." at 0402
+           display "the report said: $823,800" at 0502
+           display "You can find countless stories of people online"
+                       at 0802
+           display "who apply for hundreds of jobs every day and never"
+                       at 0902
+           display "hear back, never make it past the ai resume screen."
+                       at 1002
+           display "Click to Continue..." at 1202
+              accept keypress at 1223
+           display erase screen
+           display " $823,800 to go till retirement" at 0502
+           display "Click to Continue..." at 1202
+              accept keypress at 1223.

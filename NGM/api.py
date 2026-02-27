@@ -2,6 +2,8 @@
 NGM Game API - z/OSMF Interface
 Handles communication between COBOL game and DB2 database via z/OSMF
 """
+import math
+import random
 import sys
 import os
 import re
@@ -12,7 +14,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 
 config = configparser.ConfigParser()
-config.read('./config.ini')
+config.read('./NGM/config.ini')
 
 try:
     host = config.get('zosmf', 'host')
@@ -27,7 +29,6 @@ if not host.startswith('http'):
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 def connect_to_zosmf():
-    """Create authenticated session to z/OSMF"""
     session = requests.Session()
     session.auth = (username, password)
     session.verify = False
@@ -38,14 +39,12 @@ def connect_to_zosmf():
     return session
 
 def submit_job(session, jcl):
-    """Submit JCL job to z/OS"""
     url = f"{host.rstrip('/')}/zosmf/restjobs/jobs"
     response = session.put(url, data=jcl, headers={'Content-Type': 'text/plain'})
     response.raise_for_status()
     return response.json()
 
 def wait_for_completion(session, jobname, jobid, timeout=300):
-    """Wait for job to complete"""
     url = f"{host.rstrip('/')}/zosmf/restjobs/jobs/{jobname}/{jobid}"
     elapsed = 0
     while elapsed < timeout:
@@ -59,7 +58,6 @@ def wait_for_completion(session, jobname, jobid, timeout=300):
     raise TimeoutError(f"Job did not complete within {timeout} seconds")
 
 def get_job_output(session, jobname, jobid):
-    """Retrieve spool output from completed job"""
     try:
         url = f"{host.rstrip('/')}/zosmf/restjobs/jobs/{jobname}/{jobid}/files"
         response = session.get(url)
@@ -87,7 +85,6 @@ PARAM_MAP = {
 }
 
 def substitute_jcl_parameters(jcl_content, parameters):
-    """Replace placeholders in JCL with actual values"""
     modified = jcl_content
     for param_name, param_value in parameters.items():
         modified = modified.replace(f'&{param_name}', str(param_value))
@@ -99,11 +96,10 @@ def substitute_jcl_parameters(jcl_content, parameters):
                 modified = modified.replace(placeholder, str(param_value))
     return modified
 
-def submit_parameterized_job(job_name, parameters):
-    """Submit JCL job with parameter substitution"""
+def submit_crab_job(job_name, parameters):
     try:
         session = connect_to_zosmf()
-        with open(f'./jcl/{job_name}.jcl', 'r') as f:
+        with open(f'./NGM/jcl/{job_name}.jcl', 'r') as f:
             jcl_content = f.read()
         modified_jcl = substitute_jcl_parameters(jcl_content, parameters)
         job_info = submit_job(session, modified_jcl)
@@ -114,28 +110,25 @@ def submit_parameterized_job(job_name, parameters):
         return {'success': False, 'error': str(e), 'output': ''}
 
 def get_row_count(output):
-    """Extract row count from DB2 RETRIEVAL message"""
     if '0 ROW(S)' in output or 'RETRIEVAL OF          0' in output:
         return 0
     match = re.search(r'RETRIEVAL OF\s+(\d+)\s+ROW', output)
     return int(match.group(1)) if match else 0
 
 def check_sql_success(output):
-    """Check if SQL statement executed successfully"""
     if 'SQLCODE = -' in output:
         return False
     return 'SQLCODE = 000' in output or 'SUCCESSFUL EXECUTION' in output
 
 def parse_piped_row(output):
-    """Parse a DB2 result row with pipe-delimited format"""
     for line in output.split('\n'):
         if '|' in line and '_|' in line:
             return [p.strip() for p in line.split('|')]
     return []
 
 def parse_user_stats(output):
-    """Extract user stats from DB2 SELECT output"""
-    stats = {'bank': 0, 'hacking': 1, 'security': 1, 'job': 1}
+
+    stats = {'bank': 0, 'hacking': 1, 'security': 1, 'job': 1, 'message': 0}
     parts = parse_piped_row(output)
     if len(parts) >= 5:
         try:
@@ -143,12 +136,13 @@ def parse_user_stats(output):
             stats['hacking'] = int(parts[2]) if parts[2].isdigit() else 1
             stats['security'] = int(parts[3]) if parts[3].isdigit() else 1
             stats['job'] = int(parts[4]) if parts[4].isdigit() else 1
+            if len(parts) >= 6:
+                stats['message'] = int(parts[5]) if parts[5].isdigit() else 0
         except (ValueError, IndexError):
             pass
     return stats
 
 def parse_highscores(output):
-    """Extract highscores list from DB2 SELECT output"""
     scores = []
     for line in output.split('\n'):
         if '|' in line and '_|' in line:
@@ -164,9 +158,8 @@ def parse_highscores(output):
     return scores
 
 def write_response(message):
-    """Write response to file for COBOL to read"""
     try:
-        response_file = "./logs/api_response.dat"
+        response_file = "./NGM/logs/api_response.dat"
         if os.path.exists(response_file):
             os.remove(response_file)
         with open(response_file, "w") as f:
@@ -174,79 +167,80 @@ def write_response(message):
     except:
         pass
 
-def handle_checkuser(args):
+def checkuser(args):
     if len(args) < 1:
         return write_response("ERROR:Missing username")
-    result = submit_parameterized_job('CHECKUSER', {'USERNAME': args[0]})
+    result = submit_crab_job('CHECKUSER', {'USERNAME': args[0]})
     if result['success']:
         exists = get_row_count(result['output']) > 0
         write_response(f"SUCCESS:{'EXISTS' if exists else 'NOTEXISTS'}:{args[0]}")
     else:
         write_response(f"ERROR:{result['error']}")
 
-def handle_register(args):
+def register(args):
     if len(args) < 2:
         return write_response("ERROR:Missing username or password")
-    check = submit_parameterized_job('CHECKUSER', {'USERNAME': args[0]})
+    check = submit_crab_job('CHECKUSER', {'USERNAME': args[0]})
     if check['success'] and get_row_count(check['output']) > 0:
         return write_response(f"ERROR:Username {args[0]} already exists")
-    result = submit_parameterized_job('ADDUSER', {'USERNAME': args[0], 'USERPASS': args[1]})
+    result = submit_crab_job('ADDUSER', {'USERNAME': args[0], 'USERPASS': args[1]})
     if result['success'] and check_sql_success(result['output']):
         write_response(f"SUCCESS:REGISTERED:{args[0]}")
     else:
         write_response("ERROR:Failed to register user")
 
-def handle_login(args):
+def login(args):
     if len(args) < 2:
         return write_response("ERROR:Missing username or password")
-    result = submit_parameterized_job('LOGIN', {'USERNAME': args[0], 'USERPASS': args[1]})
+    result = submit_crab_job('LOGIN', {'USERNAME': args[0], 'USERPASS': args[1]})
     if result['success'] and get_row_count(result['output']) > 0:
         write_response(f"SUCCESS:LOGGEDIN:{args[0]}")
     else:
         write_response("ERROR:Invalid username or password")
 
-def handle_adduser(args):
+def adduser(args):
     if len(args) < 2:
         return write_response("ERROR:Missing username or password")
-    result = submit_parameterized_job('ADDUSER', {'USERNAME': args[0], 'USERPASS': args[1]})
+    result = submit_crab_job('ADDUSER', {'USERNAME': args[0], 'USERPASS': args[1]})
     if result['success'] and check_sql_success(result['output']):
         write_response(f"SUCCESS:User {args[0]} added")
     else:
         write_response("ERROR:Failed to add user")
 
-def handle_getuser(args):
+def getuser(args):
     if len(args) < 1:
         return write_response("ERROR:Missing username")
-    result = submit_parameterized_job('GETUSER', {'USERNAME': args[0]})
+    result = submit_crab_job('GETUSER', {'USERNAME': args[0]})
     if result['success'] and get_row_count(result['output']) > 0:
         stats = parse_user_stats(result['output'])
         write_response(f"SUCCESS:STATS:{str(stats['bank']).zfill(7)}:"
                       f"{str(stats['hacking']).zfill(3)}:"
                       f"{str(stats['security']).zfill(3)}:"
-                      f"{str(stats['job']).zfill(3)}")
+                      f"{str(stats['job']).zfill(3)}:"
+                      f"{str(stats['message']).zfill(3)}")
     else:
         write_response("ERROR:User not found")
 
-def handle_deposit(args):
+def deposit(args):
     if len(args) < 2:
         return write_response("ERROR:Missing username or amount")
-    result = submit_parameterized_job('DEPOSIT', {'USERNAME': args[0], 'AMOUNT': args[1]})
+    result = submit_crab_job('DEPOSIT', {'USERNAME': args[0], 'AMOUNT': args[1]})
     if result['success'] and check_sql_success(result['output']):
         write_response(f"SUCCESS:DEPOSITED:{args[1]}")
     else:
         write_response("ERROR:Deposit failed")
 
-def handle_withdraw(args):
+def withdraw(args):
     if len(args) < 2:
         return write_response("ERROR:Missing username or amount")
-    result = submit_parameterized_job('WITHDRAW', {'USERNAME': args[0], 'AMOUNT': args[1]})
+    result = submit_crab_job('WITHDRAW', {'USERNAME': args[0], 'AMOUNT': args[1]})
     if result['success'] and check_sql_success(result['output']):
         write_response(f"SUCCESS:WITHDRAWN:{args[1]}")
     else:
         write_response("ERROR:Withdraw failed - insufficient funds or user not found")
 
-def handle_highscores(args):
-    result = submit_parameterized_job('HIGHSCORES', {})
+def highscores(args):
+    result = submit_crab_job('HIGHSCORES', {})
     if result['success']:
         scores = parse_highscores(result['output'])
         if scores:
@@ -257,37 +251,88 @@ def handle_highscores(args):
     else:
         write_response(f"ERROR:{result['error']}")
 
-def handle_updateuser(args):
+def updateuser(args):
     if len(args) < 6:
         return write_response("ERROR:Missing parameters for update")
     params = {
         'USERNAME': args[0], 'UPTBANK': args[1], 'UPTSTR': args[2],
         'UPTSEC': args[3], 'UPTJOB': args[4], 'UPTMESS': args[5]
     }
-    result = submit_parameterized_job('UPDUSER', params)
+    result = submit_crab_job('UPDUSER', params)
     if result['success'] and check_sql_success(result['output']):
         write_response(f"SUCCESS:User {args[0]} updated")
     else:
         write_response("ERROR:Failed to update user")
 
-def handle_getusers(args):
-    result = submit_parameterized_job('GETUSERS', {})
+def getusers(args):
+    result = submit_crab_job('GETUSERS', {})
     if result['success']:
         write_response("SUCCESS:Users retrieved")
     else:
         write_response(f"ERROR:{result['error']}")
+
+def hacking(args):
+    random_number = random.randint(1, 100)
+    hacking_level = int(args[2])
+    target_username = args[0]
+    hacker_username = args[1]
+
+    victim_result = submit_crab_job('GETUSER', {'USERNAME': target_username})
+    if not victim_result['success'] or get_row_count(victim_result['output']) == 0:
+        return write_response("ERROR:Target user not found")
+
+    victim_stats = parse_user_stats(victim_result['output'])
+    security_level = victim_stats['security']
+
+    hacker_result = submit_crab_job('GETUSER', {'USERNAME': hacker_username})
+    if not hacker_result['success'] or get_row_count(hacker_result['output']) == 0:
+        return write_response("ERROR:Hacker user not found")
+
+    hacker_stats = parse_user_stats(hacker_result['output'])
+
+    threshold = 50 + (security_level * 10) - (hacking_level * 10)
+
+    if random_number < threshold:
+        victimparams = {
+            'USERNAME': target_username,
+            'UPTBANK': victim_stats['bank'] - 500,
+            'UPTSTR': victim_stats['hacking'],
+            'UPTSEC': victim_stats['security'],
+            'UPTJOB': victim_stats['job'],
+            'UPTMESS': victim_stats['message'] + 1
+        }
+        hackerparams = {
+            'USERNAME': hacker_username,
+            'UPTBANK': hacker_stats['bank'] + 1000,
+            'UPTSTR': hacker_stats['hacking'],
+            'UPTSEC': hacker_stats['security'],
+            'UPTJOB': hacker_stats['job'],
+            'UPTMESS': hacker_stats['message']
+        }
+
+        hack_victim = submit_crab_job('UPDUSER', victimparams)
+        hack_hacker = submit_crab_job('UPDUSER', hackerparams)
+
+        if hack_victim['success'] and hack_hacker['success']:
+            write_response("SUCCESS:Users updated")
+        else:
+            write_response("ERROR:Failed to update users after hack")
+    else:
+        write_response("ERROR:Hacking attempt failed")
+
         
 HANDLERS = {
-    'CHECKUSER': handle_checkuser,
-    'REGISTER': handle_register,
-    'LOGIN': handle_login,
-    'ADDUSER': handle_adduser,
-    'GETUSER': handle_getuser,
-    'DEPOSIT': handle_deposit,
-    'WITHDRAW': handle_withdraw,
-    'HIGHSCORES': handle_highscores,
-    'UPDATEUSER': handle_updateuser,
-    'GETUSERS': handle_getusers,
+    'CHECKUSER': checkuser,
+    'REGISTER': register,
+    'LOGIN': login,
+    'ADDUSER': adduser,
+    'GETUSER': getuser,
+    'DEPOSIT': deposit,
+    'WITHDRAW': withdraw,
+    'HIGHSCORES': highscores,
+    'UPDATEUSER': updateuser,
+    'GETUSERS': getusers,
+    'HACKING': hacking,
 }
 
 if __name__ == "__main__":

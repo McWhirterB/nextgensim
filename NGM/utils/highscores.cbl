@@ -3,7 +3,8 @@
        
        environment division.
        input-output section.
-           select api-response-file assign to "./logs/api_response.dat"
+           select api-response-file assign to 
+                           "./NGM/logs/api_response.dat"
                              organization is line sequential
                              access is sequential
                              file status is file-status.
@@ -36,7 +37,7 @@
 
        100-load-highscores.
            move spaces to api-command
-           string 'py api.py HIGHSCORES > nul 2>&1' delimited size
+           string 'py ./NGM/api.py HIGHSCORES > nul 2>&1' delimited size
                into api-command
            end-string
            call "SYSTEM" using api-command

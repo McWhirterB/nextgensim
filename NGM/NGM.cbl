@@ -3,7 +3,8 @@
        
        environment division.
        input-output section.
-           select api-response-file assign to "./logs/api_response.dat"
+           select api-response-file assign to 
+               "./NGM/logs/api_response.dat"
                organization is line sequential
                file status is file-status.
 
@@ -26,6 +27,7 @@
            05 hacking-level   pic 9(3) value 1.
            05 security-level  pic 9(3) value 1.
            05 job-level       pic 9(3) value 1.
+           05 hack-count      pic 9(3) value 0.
        
        01  login.
            05 username      pic x(20).
@@ -38,14 +40,15 @@
            05 api-command   pic x(500).
            05 api-response  pic x(1000).
            05 file-status   pic x(2).
+           05 target-name    pic x(20).
 
-       01  store.
+       01  game-store.
            05 upgrade-price pic 9(8) value 1000.
            05 total-level   pic 9(3) value 3.
 
-       01  display.
-           05 disp-money pic z(4)9.
-           05 disp-bank  pic z(6)9.
+       01  game-display.
+           05 disp-money pic -(4)9.
+           05 disp-bank  pic -(6)9.
            05 disp-price pic z(7)9.
            05 disp-level pic z(2)9.
 
@@ -59,6 +62,7 @@
        010-init.
            move 0 to wallet-change dance-step transfer-amt
            move 0 to user-money user-bank
+           move 0 to user-money
            move 1 to hacking-level security-level job-level
            move spaces to programcall username userpass
            move "NL" to login-status.
@@ -66,7 +70,7 @@
        100-welcome-screen.
            display erase screen
            move 0 to programcall
-           call "./utils/imagedisplay" using programcall 
+           call "./NGM/utils/imagedisplay" using programcall 
                dance-step
            perform 110-login-menu.
 
@@ -150,7 +154,7 @@
            display '1. Go to Work (Earn Money)' at 0702
            display '2. Event (Cost $100)' at 0802
            display '3. Store (Buy Upgrades)' at 0902
-           display '4. Hacking Attempt (Coming Soon)' at 1002
+           display '4. Hacking Attempt (Cost $500)' at 1002
            display '5. ATM (Deposit/Withdraw/Highscores)' at 1102
            display '6. Exit' at 1202
            if guest-mode
@@ -174,7 +178,7 @@
 
        300-go-to-work.
            move 1 to programcall
-           call './utils/imagedisplay' using programcall 
+           call "./NGM/utils/imagedisplay" using programcall 
                dance-step wallet-change job-level
            add wallet-change to user-money
            perform 200-main-menu.
@@ -187,7 +191,7 @@
                perform 200-main-menu
            else
                subtract 100 from user-money
-               call './utils/event' using wallet-change
+               call './NGM/utils/event' using wallet-change
                add wallet-change to user-money
                perform 200-main-menu
            end-if.
@@ -238,6 +242,29 @@
                accept user-input at 0829
            else
                subtract 500 from user-money
+               display "Enter the Name of the Target: " at 0302
+               accept target-name at 0332
+               display "Hacking in progress..." at 0502
+               string 'py ./NGM/api.py HACKING ' delimited size
+               function trim(target-name) delimited size
+               ' ' delimited size
+               function trim(username) delimited size
+               ' ' delimited size
+                hacking-level delimited size
+               ' > nul 2>&1' delimited size
+               into api-command
+               call "SYSTEM" using api-command
+               call "C$SLEEP" using 2
+               perform 590-read-response
+           if api-response(1:7) = "SUCCESS"
+               move 4 to programcall
+               call "./NGM/utils/imagedisplay" using programcall
+               perform 200-main-menu                
+           else
+               display 'HACK UNSUCCESSFUL' at 0702
+           end-if
+           display 'Press any key to continue...' at 0902
+           accept user-input at 0929
            end-if
            perform 200-main-menu.
 
@@ -249,89 +276,12 @@
                accept user-input at 0529
                perform 200-main-menu
            end-if
-           display '=== ATM ===' at 0202
-           move user-money to disp-money
-           display 'Wallet: $' at 0402 disp-money at 0415
-           move user-bank to disp-bank
-           display 'Bank Balance: $' at 0502 disp-bank at 0520
-           display '1. Deposit Money' at 0802
-           display '2. Withdraw Money' at 0902
-           display '3. View Highscores' at 1002
-           display '4. Return to Main Menu' at 1102
-           display 'Enter choice: ' at 1402
-           accept user-input at 1420
-           evaluate user-input
-               when '1' perform 341-deposit
-               when '2' perform 342-withdraw
-               when '3' perform 343-highscores
-               when '4' perform 200-main-menu
-               when other perform 340-atm
-           end-evaluate.
-
-       341-deposit.
-           display erase screen
-           display '=== DEPOSIT ===' at 0202
-           move user-money to disp-money
-           display 'Wallet Balance: $' at 0402 disp-money at 0422
-           display 'Enter amount to deposit: $' at 0602
-           accept transfer-amt at 0630
-           if transfer-amt > user-money or transfer-amt = 0
-               display 'Invalid amount.' at 0802
-               accept user-input at 0829
-               perform 340-atm
-           end-if
-           display 'Processing deposit...' at 0802
-           perform 540-api-deposit
-           if api-response(1:7) = "SUCCESS"
-               subtract transfer-amt from user-money
-               add transfer-amt to user-bank
-               display 'Deposit successful!' at 1002
-               move user-money to disp-money
-               display 'New Wallet: $' at 1102 disp-money at 1120
-               move user-bank to disp-bank
-               display 'New Bank: $' at 1202 disp-bank at 1215
-           else
-               display 'Deposit failed.' at 1002
-           end-if
-           display 'Press any key to continue...' at 1402
-           accept user-input at 1429
-           perform 340-atm.
-
-       342-withdraw.
-           display erase screen
-           display '=== WITHDRAW ===' at 0202
-           move user-bank to disp-bank
-           display 'Bank Balance: $' at 0402 disp-bank at 0420
-           display 'Enter amount to withdraw: $' at 0602
-           accept transfer-amt at 0630
-           if transfer-amt > user-bank or transfer-amt = 0
-               display 'Invalid amount.' at 0802
-               accept user-input at 0829
-               perform 340-atm
-           end-if
-           display 'Processing withdrawal...' at 0802
-           perform 550-api-withdraw
-           if api-response(1:7) = "SUCCESS"
-               add transfer-amt to user-money
-               subtract transfer-amt from user-bank
-               display 'Withdrawal successful!' at 1002
-               move user-money to disp-money
-               display 'New Wallet: $' at 1102 disp-money at 1120
-               move user-bank to disp-bank
-               display 'New Bank: $' at 1202 disp-bank at 1215
-           else
-               display 'Withdrawal failed.' at 1002
-           end-if
-           display 'Press any key to continue...' at 1402
-           accept user-input at 1429
-           perform 340-atm.
-
-       343-highscores.
-           call "./utils/highscores"
-           perform 340-atm.
+           call './NGM/utils/atm' using username user-money user-bank
+           perform 200-main-menu.
+  
        500-api-login.
            move spaces to api-command
-           string 'py api.py LOGIN ' delimited size
+           string 'py ./NGM/api.py LOGIN ' delimited size
                function trim(username) delimited size
                ' ' delimited size
                function trim(userpass) delimited size
@@ -343,7 +293,7 @@
 
        510-api-getuser.
            move spaces to api-command
-           string 'py api.py GETUSER ' delimited size
+           string 'py ./NGM/api.py GETUSER ' delimited size
                function trim(username) delimited size
                ' > nul 2>&1' delimited size
                into api-command
@@ -351,22 +301,30 @@
            call "C$SLEEP" using 2
            perform 590-read-response
            if api-response(1:7) = "SUCCESS"
-               move function numval(api-response(15:7)) 
+               move function numval(api-response(15:7))
                    to user-bank
-               move function numval(api-response(23:3)) 
+               move function numval(api-response(23:3))
                    to hacking-level
-               move function numval(api-response(27:3)) 
+               move function numval(api-response(27:3))
                    to security-level
-               move function numval(api-response(31:3)) 
+               move function numval(api-response(31:3))
                    to job-level
-               display "Stats loaded from server." at 0902
+               move function numval(api-response(35:3))
+                   to hack-count
+               if hack-count > 0
+                   display "WARNING: You have been hacked " at 1002
+                   display hack-count at 1032
+                   display " time(s)!" at 1035
+                   perform 540-api-resetmessage
+               end-if
+               display "Press Any Key to Continue..." at 1102
            else
                display "Could not load stats." at 0902
            end-if.
 
        520-api-adduser.
            move spaces to api-command
-           string 'py api.py ADDUSER ' delimited size
+           string 'py ./NGM/api.py ADDUSER ' delimited size
                function trim(username) delimited size
                ' ' delimited size
                function trim(userpass) delimited size
@@ -379,7 +337,7 @@
        530-api-updateuser.
            display 'Saving to server...' at 1402
            move spaces to api-command
-           string 'py api.py UPDATEUSER ' delimited size
+           string 'py ./NGM/api.py UPDATEUSER ' delimited size
                function trim(username) delimited size
                ' ' delimited size
                user-bank delimited size
@@ -401,29 +359,24 @@
            end-if
            accept user-input at 1529.
 
-       540-api-deposit.
+       540-api-resetmessage.
            move spaces to api-command
-           string 'py api.py DEPOSIT ' delimited size
+           string 'py ./NGM/api.py UPDATEUSER ' delimited size
                function trim(username) delimited size
                ' ' delimited size
-               transfer-amt delimited size
-               ' > nul 2>&1' delimited size
+               user-bank delimited size
+               ' ' delimited size
+               hacking-level delimited size
+               ' ' delimited size
+               security-level delimited size
+               ' ' delimited size
+               job-level delimited size
+               ' 0 > nul 2>&1' delimited size
                into api-command
            call "SYSTEM" using api-command
            call "C$SLEEP" using 2
-           perform 590-read-response.
+           move 0 to hack-count.
 
-       550-api-withdraw.
-           move spaces to api-command
-           string 'py api.py WITHDRAW ' delimited size
-               function trim(username) delimited size
-               ' ' delimited size
-               transfer-amt delimited size
-               ' > nul 2>&1' delimited size
-               into api-command
-           call "SYSTEM" using api-command
-           call "C$SLEEP" using 2
-           perform 590-read-response.
 
        590-read-response.
            move spaces to api-response
@@ -438,7 +391,7 @@
        999-exit.
            move 3 to programcall
            move 6 to dance-step
-           call "./utils/imagedisplay" using programcall 
+           call "./NGM/utils/imagedisplay" using programcall 
                dance-step
            display erase screen
            display "Thanks for playing!" at 0220
