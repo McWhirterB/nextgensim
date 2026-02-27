@@ -1,0 +1,75 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Current COBOL File",
+            "type": "shell",
+            "command": "cobc",
+            "args": [
+                "-x",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}.exe",
+                "${file}"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build All (Development)",
+            "type": "shell",
+            "command": "cmd",
+            "args": [
+                "/c",
+                "cobc -x -o NGM/utils/imagedisplay.exe NGM/utils/imagedisplay.cbl && cobc -x -o NGM/utils/event.exe NGM/utils/event.cbl && cobc -x -o NGM/utils/atm.exe NGM/utils/atm.cbl && cobc -x -o NGM/utils/highscores.exe NGM/utils/highscores.cbl && cobc -x -o NGM/NGM.exe NGM/NGM.cbl && cobc -x -o game.exe game.cbl && echo Build Complete!"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build for Production (with api.exe)",
+            "type": "shell",
+            "command": "cmd",
+            "args": [
+                "/c",
+                "python build_config.py && pyinstaller --onefile --noconsole NGM/api_standalone.py -n api --distpath NGM && del NGM\\api_standalone.py && echo API built! Now building COBOL... && powershell -Command \"(Get-Content NGM/NGM.cbl) -replace 'py ./NGM/api.py', './NGM/api.exe' | Set-Content NGM/NGM_prod.cbl\" && powershell -Command \"(Get-Content NGM/utils/atm.cbl) -replace 'py ./NGM/api.py', './NGM/api.exe' | Set-Content NGM/utils/atm_prod.cbl\" && cobc -x -o NGM/utils/imagedisplay.exe NGM/utils/imagedisplay.cbl && cobc -x -o NGM/utils/event.exe NGM/utils/event.cbl && cobc -x -o NGM/utils/atm.exe NGM/utils/atm_prod.cbl && cobc -x -o NGM/utils/highscores.exe NGM/utils/highscores.cbl && cobc -x -o NGM/NGM.exe NGM/NGM_prod.cbl && cobc -x -o game.exe game.cbl && del NGM\\NGM_prod.cbl && del NGM\\utils\\atm_prod.cbl && echo Production Build Complete!"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Game",
+            "type": "shell",
+            "command": "game.exe",
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated"
+            },
+            "problemMatcher": [],
+            "dependsOn": "Build All (Development)"
+        }
+    ]
+}

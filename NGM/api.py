@@ -1,7 +1,4 @@
-"""
-NGM Game API - z/OSMF Interface
-Handles communication between COBOL game and DB2 database via z/OSMF
-"""
+
 import math
 import random
 import sys
@@ -14,7 +11,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 
 config = configparser.ConfigParser()
-config.read('./NGM/config.ini')
+config.read('./config.ini')
 
 try:
     host = config.get('zosmf', 'host')
